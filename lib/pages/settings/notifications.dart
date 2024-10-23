@@ -4,8 +4,9 @@ import 'package:logging/logging.dart';
 import 'package:provider/provider.dart';
 
 import 'package:chopper/chopper.dart' show Response;
-import 'package:device_apps/device_apps.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:installed_apps/app_info.dart';
+import 'package:installed_apps/installed_apps.dart';
 import 'package:notifications_listener_service/notifications_listener_service.dart';
 
 import 'package:waterflyiii/auth.dart';
@@ -173,7 +174,7 @@ class _SettingsNotificationsState extends State<SettingsNotifications> {
               onTap: () async {
                 final SettingsProvider settings =
                     context.read<SettingsProvider>();
-                Application? app = await showDialog<Application>(
+                AppInfo? app = await showDialog<AppInfo>(
                   context: context,
                   builder: (BuildContext context) => const AppDialog(),
                 );
@@ -184,7 +185,7 @@ class _SettingsNotificationsState extends State<SettingsNotifications> {
                 await settings.notificationAddUsedApp(app.packageName);
                 await settings.notificationSetAppSettings(
                   app.packageName,
-                  NotificationAppSettings(app.appName),
+                  NotificationAppSettings(app.name),
                 );
                 setState(() {});
               },
@@ -453,18 +454,16 @@ class AppDialogEntry extends StatelessWidget {
   Widget build(BuildContext context) {
     final Logger log = Logger("Notifications.AppDialog.Entry");
 
-    return FutureBuilder<Application?>(
-      future: DeviceApps.getApp(app, true),
-      builder: (BuildContext context, AsyncSnapshot<Application?> snapshot) {
+    return FutureBuilder<AppInfo?>(
+      future: InstalledApps.getAppInfo(app),
+      builder: (BuildContext context, AsyncSnapshot<AppInfo?> snapshot) {
         if (snapshot.connectionState == ConnectionState.done) {
           if (snapshot.data == null) {
             return const SizedBox.shrink();
           }
           late Widget leading;
           try {
-            final ApplicationWithIcon appIcon =
-                snapshot.data! as ApplicationWithIcon;
-            leading = Image.memory(appIcon.icon);
+            leading = Image.memory(snapshot.data!.icon!);
           } catch (e) {
             leading = const Icon(Icons.api);
           }
@@ -472,7 +471,7 @@ class AppDialogEntry extends StatelessWidget {
             leading: CircleAvatar(
               child: leading,
             ),
-            title: Text(snapshot.data!.appName),
+            title: Text(snapshot.data!.name),
             subtitle: Text(app),
             onTap: () {
               Navigator.pop(context, snapshot.data);
