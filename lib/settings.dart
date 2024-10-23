@@ -41,23 +41,35 @@ class NotificationAppSettings {
 }
 
 class NotificationFilter {
-  NotificationFilter(this.filterName, this.packageName, {String? id})
-      : id = id ?? Uuid().v4();
-
   final String id;
-  final String filterName;
+  String? accountId;
+  String pattern;
   final String packageName;
 
-  NotificationFilter.fromJson(Map<String, dynamic> json)
-      : id = json['id'] as String,
-        filterName = json['filterName'] as String,
-        packageName = json['packageName'] as String;
+  NotificationFilter({
+    String? id,
+    this.accountId,
+    required this.pattern,
+    required this.packageName,
+  }) : id = id ?? const Uuid().v4();
 
-  Map<String, dynamic> toJson() => <String, dynamic>{
-        'id': id,
-        'filterName': filterName,
-        'packageName': packageName,
-      };
+  factory NotificationFilter.fromJson(Map<String, dynamic> json) {
+    return NotificationFilter(
+      id: json['id'] as String,
+      accountId: json['accountId'] as String,
+      pattern: json['pattern'] as String,
+      packageName: json['packageName'] as String,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'accountId': accountId ?? "",
+      'pattern': pattern,
+      'packageName': packageName,
+    };
+  }
 }
 
 enum BoolSettings {
@@ -359,7 +371,7 @@ class SettingsProvider with ChangeNotifier {
         .map((String json) => NotificationFilter.fromJson(jsonDecode(json)))
         .toList();
 
-    NotificationFilter filter = NotificationFilter("New filter", packageName);
+    NotificationFilter filter = NotificationFilter(packageName: packageName, pattern: "");
     filters.add(filter);
 
     await prefs.setStringList(
@@ -376,7 +388,23 @@ class SettingsProvider with ChangeNotifier {
     return true;
   }
 
-   Future<List<NotificationFilter>> notificationGetFilters(
+  Future<void> notificationUpdateFilter(NotificationFilter filter) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+
+    final List<String> filtersJSON =
+        prefs.getStringList(settingNLFilters) ?? <String>[];
+    final List<NotificationFilter> filters = filtersJSON
+        .map((String json) => NotificationFilter.fromJson(jsonDecode(json)))
+        .toList();
+
+    final NotificationFilter d = filters.firstOrNull((NotificationFilter e) => e.id == filter.id);
+
+    filters.re
+
+    // TODO: Get corresponding filter and update it
+  }
+
+  Future<List<NotificationFilter>> notificationGetFilters(
       {bool forceReload = false}) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     if (forceReload) {
