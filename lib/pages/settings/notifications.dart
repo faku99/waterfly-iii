@@ -215,6 +215,20 @@ class NotificationFilters extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
+        SizedBox(
+          // width: 48,
+          child: Align(
+            alignment: Alignment.center,
+            child: IconButton(
+              icon: const Icon(Icons.delete),
+              onPressed: () {
+                context.read<SettingsProvider>().notificationResetFilters();
+                log.finest(() => "Delete all filters");
+              },
+              tooltip: S.of(context).transactionSplitDelete,
+            ),
+          ),
+        ),
         ...context.watch<SettingsProvider>().notificationFilters.map(
           (NotificationFilter filter) {
             return FilterCard(filter: filter);

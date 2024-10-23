@@ -343,6 +343,12 @@ class SettingsProvider with ChangeNotifier {
     return prefs.setStringList(settingNLKnownApps, apps);
   }
 
+  Future<bool> notificationResetFilters() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+
+    return prefs.remove(settingNLFilters);
+  }
+
   Future<bool> notificationAddFilter(String packageName) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.reload();
