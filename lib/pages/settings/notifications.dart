@@ -184,6 +184,7 @@ class _SettingsNotificationsState extends State<SettingsNotifications> {
                 }
 
                 await settings.notificationAddUsedApp(app.packageName);
+                await settings.notificationAddFilter(app.packageName);
                 await settings.notificationSetAppSettings(
                   app.packageName,
                   NotificationAppSettings(app.name),
@@ -192,10 +193,34 @@ class _SettingsNotificationsState extends State<SettingsNotifications> {
               },
             ),
             const Divider(),
+            const NotificationFilters(),
+            const Divider(),
             const NotificationApps(),
           ],
         ],
       ),
+    );
+  }
+}
+
+class NotificationFilters extends StatelessWidget {
+  const NotificationFilters({
+    super.key,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final Logger log = Logger("Notifications.Filters");
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        ...context.watch<SettingsProvider>().notificationFilters.map(
+          (NotificationFilter filter) {
+            return FilterCard(filter: filter);
+          },
+        ),
+      ],
     );
   }
 }
@@ -270,6 +295,18 @@ class NotificationApps extends StatelessWidget {
   }
 }
 
+class FilterCard extends StatefulWidget {
+  const FilterCard({
+    super.key,
+    required this.filter,
+  });
+
+  final NotificationFilter filter;
+
+  @override
+  State<FilterCard> createState() => _FilterCardState();
+}
+
 class AppCard extends StatefulWidget {
   const AppCard({
     super.key,
@@ -284,6 +321,38 @@ class AppCard extends StatefulWidget {
 
   @override
   State<AppCard> createState() => _AppCardState();
+}
+
+class _FilterCardState extends State<FilterCard> {
+  @override
+  Widget build(BuildContext context) {
+    final Logger log = Logger("Notifications._FilterCardState");
+
+    return Card(
+        child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: <Widget>[
+                Expanded(child: Text(widget.filter.filterName)),
+                SizedBox(
+                  // width: 48,
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: IconButton(
+                      icon: const Icon(Icons.delete),
+                      onPressed: () {
+                        context
+                            .read<SettingsProvider>()
+                            .notificationRemoveFilter(widget.filter.id);
+                        log.finest(() => "Delete ${widget.filter.id}");
+                      },
+                      tooltip: S.of(context).transactionSplitDelete,
+                    ),
+                  ),
+                ),
+              ],
+            )));
+  }
 }
 
 class _AppCardState extends State<AppCard> {
