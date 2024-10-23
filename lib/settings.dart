@@ -318,20 +318,6 @@ class SettingsProvider with ChangeNotifier {
     return prefs.setStringList(settingNLKnownApps, apps);
   }
 
-  Future<List<String>> notificationKnownApps({bool filterUsed = false}) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    final List<String> apps =
-        prefs.getStringList(settingNLKnownApps) ?? <String>[];
-    if (filterUsed) {
-      final List<String> knownApps = await notificationUsedApps();
-      return apps
-          .where((String element) => !knownApps.contains(element))
-          .toList();
-    }
-
-    return apps;
-  }
-
   Future<bool> notificationAddUsedApp(String packageName) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.reload();
