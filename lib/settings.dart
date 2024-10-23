@@ -12,6 +12,7 @@ import 'package:logging/logging.dart';
 import 'package:path_provider/path_provider.dart' show getTemporaryDirectory;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
+import 'package:uuid/uuid.dart';
 import 'package:waterflyiii/pages/bills.dart';
 
 final Logger log = Logger("Settings");
@@ -36,6 +37,26 @@ class NotificationAppSettings {
         'appName': appName,
         'defaultAccountId': defaultAccountId,
         'includeTitle': includeTitle,
+      };
+}
+
+class NotificationFilter {
+  NotificationFilter(this.filterName, this.packageName, {String? id})
+      : id = id ?? Uuid().v4();
+
+  final String id;
+  final String filterName;
+  final String packageName;
+
+  NotificationFilter.fromJson(Map<String, dynamic> json)
+      : id = json['id'] as String,
+        filterName = json['filterName'] as String,
+        packageName = json['packageName'] as String;
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'id': id,
+        'filterName': filterName,
+        'packageName': packageName,
       };
 }
 
@@ -100,6 +121,7 @@ class SettingsProvider with ChangeNotifier {
   static const String settingNLKnownApps = "NL_KNOWNAPPS";
   static const String settingNLUsedApps = "NL_USEDAPPS";
   static const String settingNLAppPrefix = "NL_APP_";
+  static const String settingNLFilters = "NL_FILTERS";
   static const String settingTheme = "THEME";
   static const String settingThemeDark = "DARK";
   static const String settingThemeLight = "LIGHT";
@@ -134,6 +156,9 @@ class SettingsProvider with ChangeNotifier {
 
   List<String> _notificationApps = <String>[];
   List<String> get notificationApps => _notificationApps;
+
+  List<NotificationFilter> _notificationFilters = <NotificationFilter>[];
+  List<NotificationFilter> get notificationFilters => _notificationFilters;
 
   BillsLayout _billsLayout = BillsLayout.grouped;
   BillsLayout get billsLayout => _billsLayout;
@@ -318,6 +343,49 @@ class SettingsProvider with ChangeNotifier {
     return prefs.setStringList(settingNLKnownApps, apps);
   }
 
+  Future<bool> notificationAddFilter(String packageName) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.reload();
+
+    final List<String> filtersJSON =
+        prefs.getStringList(settingNLFilters) ?? <String>[];
+    final List<NotificationFilter> filters = filtersJSON
+        .map((String json) => NotificationFilter.fromJson(jsonDecode(json)))
+        .toList();
+
+    NotificationFilter filter = NotificationFilter("New filter", packageName);
+    filters.add(filter);
+
+    await prefs.setStringList(
+        settingNLFilters,
+        filters
+            .map((NotificationFilter filter) => jsonEncode(filter))
+            .toList());
+
+    _notificationFilters = filters;
+
+    log.finest(() => "notify SettingsProvider->notificationAddFilter()");
+    notifyListeners();
+
+    return true;
+  }
+
+   Future<List<NotificationFilter>> notificationGetFilters(
+      {bool forceReload = false}) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    if (forceReload) {
+      await prefs.reload();
+    }
+
+    final List<String> filtersJSON =
+        prefs.getStringList(settingNLFilters) ?? <String>[];
+    final List<NotificationFilter> filters = filtersJSON
+        .map((String json) => NotificationFilter.fromJson(jsonDecode(json)))
+        .toList();
+
+    return filters;
+  }
+
   Future<bool> notificationAddUsedApp(String packageName) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.reload();
@@ -335,6 +403,30 @@ class SettingsProvider with ChangeNotifier {
 
     log.finest(() => "notify SettingsProvider->notificationAddUsedApp()");
     notifyListeners();
+    return true;
+  }
+
+  Future<bool> notificationRemoveFilter(String filterId) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+
+    final List<String> filtersJSON =
+        prefs.getStringList(settingNLFilters) ?? <String>[];
+    final List<NotificationFilter> filters = filtersJSON
+        .map((String json) => NotificationFilter.fromJson(jsonDecode(json)))
+        .toList();
+    filters.removeWhere((NotificationFilter filter) => filter.id == filterId);
+    await prefs.setStringList(
+        settingNLFilters,
+        filters
+            .map((NotificationFilter filter) => jsonEncode(filter))
+            .toList());
+
+    _notificationFilters = filters;
+
+    log.finest(() => "notify SettingsProvider->notificationRemoveFilter()");
+
+    notifyListeners();
+
     return true;
   }
 
