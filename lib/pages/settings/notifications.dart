@@ -208,34 +208,61 @@ class NotificationFilters extends StatelessWidget {
     super.key,
   });
 
+  Future<AccountArray> _getAccounts(BuildContext context) async {
+    final FireflyIii api = context.read<FireflyService>().api;
+
+    // Accounts
+    final Response<AccountArray> respAccounts =
+        await api.v1AccountsGet(type: AccountTypeFilter.assetAccount);
+    apiThrowErrorIfEmpty(respAccounts, context.mounted ? context : null);
+
+    return respAccounts.body!;
+  }
+
   @override
   Widget build(BuildContext context) {
     final Logger log = Logger("Notifications.Filters");
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        SizedBox(
-          // width: 48,
-          child: Align(
-            alignment: Alignment.center,
-            child: IconButton(
-              icon: const Icon(Icons.delete),
-              onPressed: () {
-                context.read<SettingsProvider>().notificationResetFilters();
-                log.finest(() => "Delete all filters");
-              },
-              tooltip: S.of(context).transactionSplitDelete,
-            ),
-          ),
-        ),
-        ...context.watch<SettingsProvider>().notificationFilters.map(
-          (NotificationFilter filter) {
-            return FilterCard(filter: filter);
-          },
-        ),
-      ],
-    );
+    return FutureBuilder<AccountArray>(
+        future: _getAccounts(context),
+        builder: (BuildContext context, AsyncSnapshot<AccountArray> snapshot) {
+          if (snapshot.hasData) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                SizedBox(
+                  // width: 48,
+                  child: Align(
+                    alignment: Alignment.center,
+                    child: IconButton(
+                      icon: const Icon(Icons.delete),
+                      onPressed: () {
+                        context
+                            .read<SettingsProvider>()
+                            .notificationResetFilters();
+                        log.finest(() => "Delete all filters");
+                      },
+                      tooltip: S.of(context).transactionSplitDelete,
+                    ),
+                  ),
+                ),
+                ...context.watch<SettingsProvider>().notificationFilters.map(
+                  (NotificationFilter filter) {
+                    return FilterCard(accounts: snapshot.data!, filter: filter);
+                  },
+                ),
+              ],
+            );
+          } else if (snapshot.hasError) {
+            log.severe(
+                "error getting accounts", snapshot.error, snapshot.stackTrace);
+            return Text(S
+                .of(context)
+                .settingsNLServiceCheckingError(snapshot.error.toString()));
+          } else {
+            return const Center(child: CircularProgressIndicator());
+          }
+        });
   }
 }
 
@@ -312,9 +339,11 @@ class NotificationApps extends StatelessWidget {
 class FilterCard extends StatefulWidget {
   const FilterCard({
     super.key,
+    required this.accounts,
     required this.filter,
   });
 
+  final AccountArray accounts;
   final NotificationFilter filter;
 
   @override
@@ -342,30 +371,93 @@ class _FilterCardState extends State<FilterCard> {
   Widget build(BuildContext context) {
     final Logger log = Logger("Notifications._FilterCardState");
 
-    return Card(
-        child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              children: <Widget>[
-                Expanded(child: Text(widget.filter.filterName)),
-                SizedBox(
-                  // width: 48,
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: IconButton(
-                      icon: const Icon(Icons.delete),
-                      onPressed: () {
-                        context
-                            .read<SettingsProvider>()
-                            .notificationRemoveFilter(widget.filter.id);
-                        log.finest(() => "Delete ${widget.filter.id}");
-                      },
-                      tooltip: S.of(context).transactionSplitDelete,
-                    ),
-                  ),
-                ),
-              ],
-            )));
+    List<DropdownMenuEntry<AccountRead>> accountOptions =
+        <DropdownMenuEntry<AccountRead>>[];
+
+    AccountRead? currentAccount = widget.accounts.data.first;
+    for (AccountRead e in widget.accounts.data) {
+      accountOptions.add(DropdownMenuEntry<AccountRead>(
+        value: e,
+        label: e.attributes.name,
+      ));
+      if (widget.filter.accountId == e.id) {
+        currentAccount = e;
+      }
+    }
+
+    return FutureBuilder<AppInfo?>(
+        future: InstalledApps.getAppInfo(widget.filter.packageName),
+        builder: (BuildContext context, AsyncSnapshot<AppInfo?> snapshot) {
+          if (snapshot.hasData) {
+            return Card(
+                child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 6.0, horizontal: 12.0),
+                    child: Column(children: <Widget>[
+                      Row(
+                        children: <Widget>[
+                          Expanded(
+                            child: Text(
+                              snapshot.data!.name,
+                              style: TextStyle(
+                                  fontSize: 18.0, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          SizedBox(
+                            child: Align(
+                              alignment: Alignment.centerRight,
+                              child: IconButton(
+                                icon: const Icon(Icons.delete),
+                                onPressed: () {
+                                  context
+                                      .read<SettingsProvider>()
+                                      .notificationRemoveFilter(
+                                          widget.filter.id);
+                                  log.finest(
+                                      () => "Delete ${widget.filter.id}");
+                                },
+                                tooltip: S.of(context).transactionSplitDelete,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8.0),
+                        child: DropdownMenu<AccountRead>(
+                          initialSelection: currentAccount,
+                          leadingIcon: const Icon(Icons.account_balance),
+                          label: Text(S.of(context).settingsNLAppAccount),
+                          dropdownMenuEntries: accountOptions,
+                          expandedInsets: EdgeInsets.zero,
+                          onSelected: (AccountRead? account) async {
+                            FocusManager.instance.primaryFocus?.unfocus();
+                            widget.filter.accountId = account!.id;
+
+                            await context
+                                .read<SettingsProvider>()
+                                .notificationUpdateFilter(widget.filter);
+                          },
+                        ),
+                      ),
+                      TextField(
+                        minLines: 3,
+                        maxLines: null,
+                        keyboardType: TextInputType.multiline,
+                        decoration: InputDecoration(
+                            filled: true, labelText: "Filtering pattern"),
+                      ),
+                      Text(
+                          "Use {amount} and {title} to indicate where those values should be retrieved."),
+                    ])));
+          } else if (snapshot.hasError) {
+            log.severe(
+                "Could not retrieve AppInfo for filter ${widget.filter.id}");
+            return const SizedBox.shrink();
+          } else {
+            return const Center(child: CircularProgressIndicator());
+          }
+        });
   }
 }
 
